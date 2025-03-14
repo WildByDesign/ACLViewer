@@ -1,10 +1,20 @@
 # ACLViewer
 ACL Viewer for Windows
 
-- automatic dark mode / light mode depending on system theme
-- fast ACL/SDDL/ACCESS_MASK parsing
-- displays ACLs for directories and files
+- Automatic dark mode / light mode depending on system theme
+- Fast ACL/SDDL/ACCESS_MASK parsing
+- Displays ACLs for directories and files
+
+# Hotkeys
+
+- F5 to refresh the treeview
+
+# To Do
+
+- Add an Export option to export the ACL ListView as .txt or .csv
+- Add an Export option to export selected ACE with permissions (and individual permission access masks)
 
 # Screenshot
 
-![ACLViewer](https://github.com/user-attachments/assets/671993d5-bfb2-4735-a5a6-2a5915b77967)
+![ACLViewer-1 1](https://github.com/user-attachments/assets/86248d6a-26f3-4ca4-b279-a7a3a477afbd)
+
