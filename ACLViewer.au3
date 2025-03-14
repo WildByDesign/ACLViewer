@@ -26,7 +26,8 @@
 #include <File.au3>
 #include <StringConstants.au3>
 #include <Misc.au3>
-
+Global $isDarkMode = False
+Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 #include "include\GUIFrame.au3"
 #include "include\GUIDarkMode_v0.02mod.au3"
 #include "include\Permissions-Unicode.au3"
@@ -37,8 +38,8 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Description=ACL Viewer
 #AutoIt3Wrapper_res_requestedExecutionLevel=requireAdministrator
-#AutoIt3Wrapper_Res_Fileversion=1.0.0
-#AutoIt3Wrapper_Res_ProductVersion=1.0.0
+#AutoIt3Wrapper_Res_Fileversion=1.1.0
+#AutoIt3Wrapper_Res_ProductVersion=1.1.0
 #AutoIt3Wrapper_Res_ProductName=ACLViewer
 #AutoIt3Wrapper_Outfile_x64=ACLViewer.exe
 #AutoIt3Wrapper_OutFile_x86=ACLViewer.exe
@@ -50,6 +51,9 @@
 #AutoIt3Wrapper_Res_Icon_Add=icons\harddrive.ico ; @ScriptFullPath, 4
 #AutoIt3Wrapper_Res_Icon_Add=icons\file.ico ; @ScriptFullPath, 5
 #AutoIt3Wrapper_Res_Icon_Add=icons\removable.ico ; @ScriptFullPath, 6
+#AutoIt3Wrapper_Res_Icon_Add=icons\foldersel.ico ; @ScriptFullPath, 7
+#AutoIt3Wrapper_Res_Icon_Add=icons\filesel.ico ; @ScriptFullPath, 8
+#AutoIt3Wrapper_Res_Icon_Add=icons\harddrivesel.ico ; @ScriptFullPath, 9
 ;#AutoIt3Wrapper_Res_Icon_Add=AppControl-Disabled.ico ;
 ;#EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -62,10 +66,10 @@ If @Compiled = 0 Then
 	DllCall("User32.dll", "bool", "SetProcessDpiAwarenessContext" , "HWND", "DPI_AWARENESS_CONTEXT" -4)
 EndIf
 
-Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
+;Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 Global $sRootFolder = StringLeft(@AutoItExe, StringInStr(@AutoItExe, "\", Default, -1))
 ;ConsoleWrite($sRootFolder & @CRLF)
-Global $oOwner, $aAcct, $AccessMaskBits
+Global $oOwner, $aAcct, $AccessMaskBits, $sFolder, $expandedItem, $displaySelected
 Global $b00, $b01, $b02, $b03, $b04, $b05, $b06, $b07, $b08, $b09, $b10, $b11, $b12, $b13, $b14, $b15, $b16, $b17, $b18, $b19, $b20, $b21, $b22, $b23, $b24, $b25, $b26, $b27, $b28, $b29, $b30, $b31
 
 $GetDPI = _GetDPI()
@@ -86,8 +90,16 @@ ElseIf $GetDPI = 144 Then
     $TV_Icons = 24
 ElseIf $GetDPI = 168 Then
 	$DPIScale = 175
+    $TV_Icons = 24
 ElseIf $GetDPI = 192 Then
 	$DPIScale = 200
+    $TV_Icons = 32
+ElseIf $GetDPI = 240 Then
+	$DPIScale = 250
+    $TV_Icons = 40
+ElseIf $GetDPI = 288 Then
+	$DPIScale = 300
+    $TV_Icons = 48
 Else
     $TV_Icons = 16
 EndIf
@@ -152,8 +164,11 @@ EndIf
 _InitiatePermissionResources()
 
 ; StartUp of the TreeListExplorer UDF (required)
-__TreeListExplorer_StartUp()
+__TreeListExplorer_StartUp($__TreeListExplorer_Lang_EN, $TV_Icons)
 If @error Then ConsoleWrite("__TreeListExplorer_StartUp failed: "&@error&":"&@extended&@crlf)
+
+
+HotKeySet("{F5}", "RefreshTV")
 
 
 ;Create GUI
@@ -169,7 +184,7 @@ $FrameWidth2 = $FrameWidth1 - 14
 $iFrame_A = _GUIFrame_Create($hGUI_1, 0, $FrameWidth1)
 
 ;Set min sizes for the frames
-_GUIFrame_SetMin($iFrame_A, 50, 100)
+_GUIFrame_SetMin($iFrame_A, 200, 600)
 
 ;Create Explorer Listviews
 _GUIFrame_Switch($iFrame_A, 1)
@@ -181,11 +196,11 @@ GUISetFont(10.5,  $FW_NORMAL, 0, $MainFont)
 Global $hTreeViewRight = GUICtrlCreateTreeView(10,15,$aWinSize1[0] - 10, $aWinSize1[1] - 15)
 
 ; Create TLE system for the right side
-Global $hTLESystemRight = __TreeListExplorer_CreateSystem($hGUI_1, "", "_currentFolder")
+Global $hTLESystemRight = __TreeListExplorer_CreateSystem($hGUI_1, "", "_currentFolder", "_selectCallback")
 If @error Then ConsoleWrite("__TreeListExplorer_CreateSystem failed: "&@error&":"&@extended&@crlf)
 
 ; Add Views to TLE system: ShowFolders=True, ShowFiles=True
-__TreeListExplorer_AddView($hTLESystemRight, $hTreeViewRight, True, True, "_clickCallback", "_doubleClickCallback", "_loadingCallback", "_selectCallback")
+__TreeListExplorer_AddView($hTLESystemRight, $hTreeViewRight, True, True, "_clickCallback", "_doubleClickCallback", "_loadingCallback")
 If @error Then ConsoleWrite("__TreeListExplorer_AddView $hTreeView failed: "&@error&":"&@extended&@crlf)
 
 
@@ -196,44 +211,45 @@ If @error Then ConsoleWrite("__TreeListExplorer_AddView $hTreeView failed: "&@er
 ;__TreeListExplorer_OpenPath($hTLESystemRight, 'C:\')
 ;If @error Then ConsoleWrite("__TreeListExplorer_OpenPath failed: "&@error&":"&@extended&@crlf)
 
-    Func _currentFolder($hSystem, $sRoot, $sFolder)
-        ;GUICtrlSetData($hLabelCurrentFolderRight, $sRoot&$sFolder)
-        ; ConsoleWrite("Current folder in system "&$hSystem&": "&$sRoot&$sFolder&@CRLF)
+    Func _currentFolder($hSystem, $sRoot, $sFolder, $sSelected)
+        ;GUICtrlSetData($hLabelCurrentFolderRight, $sRoot&$sFolder&"["&$sSelected&"]")
+        ; ConsoleWrite("Folder "&$hSystem&": "&$sRoot&$sFolder&"["&$sSelected&"]"&@CRLF)
     EndFunc
     
-    Func _selectCallback($hSystem, $hView, $sRoot, $sFolder)
-        ;GUICtrlSetData($hLabelCurrentFolderRight, $sRoot&$sFolder)
-        ConsoleWrite("Select at "&$hView&": "&$sRoot&$sFolder&@CRLF)
-        $newItem = $sRoot&$sFolder
-
-        ;GUICtrlSetData($selectionLabel, " Object:   " & $newItem)
-        ;GUICtrlSetData($selectionLabel, " Object: " & @TAB & $newItem)
+    Func _selectCallback($hSystem, $sRoot, $sFolder, $sSelected)
+        ;GUICtrlSetData($hLabelSelectRight, $sRoot&$sFolder&"["&$sSelected&"]")
+        ;ConsoleWrite("MyData: " & $sRoot&$sFolder&"["&$sSelected&"]" & @CRLF)
+        ;ConsoleWrite("MyData: " & $sRoot&$sFolder & @CRLF)
+        ; ConsoleWrite("Select "&$hSystem&": "&$sRoot&$sFolder&"["&$sSelected&"]"&@CRLF)
+        ;__TreeListExplorer__FileGetIconIndex($sRoot&$sFolder&$sSelected)
+        $newItem = $sRoot&$sFolder&$sSelected
+        $displaySelected = $sSelected
         treeviewChangesfunc()
     EndFunc
     
-    Func _clickCallback($hSystem, $hView, $sRoot, $sFolder)
-        ConsoleWrite("Click at "&$hView&": "&$sRoot&$sFolder&@CRLF)
+    Func _clickCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $item)
+        ;ConsoleWrite("Click at "&$hView&": "&$sRoot&$sFolder&"["&$sSelected&"] :"&$item&@CRLF)
     EndFunc
 
-    Func _doubleClickCallback($hSystem, $hView, $sRoot, $sFolder)
-        ConsoleWrite("Double click at "&$hView&": "&$sRoot&$sFolder&@CRLF)
+    Func _doubleClickCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $item)
+        ;ConsoleWrite("Double click at "&$hView&": "&$sRoot&$sFolder&"["&$sSelected&"] :"&$item&@CRLF)
     EndFunc
     
-    Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $bLoading)
+    Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
         If $bLoading Then
             Switch $hView
                 Case GUICtrlGetHandle($hTreeViewRight)
-                    ToolTip("Loading: "&$sRoot&$sFolder)
+                    ;ToolTip("Loading: "&$sRoot&$sFolder)
                     ;GUICtrlSetData($hProgressRight, 50)
             EndSwitch
         Else
             Switch $hView
                 Case GUICtrlGetHandle($hTreeViewRight)
-                    ToolTip("Loading: "&$sRoot&$sFolder)
+                    ;ToolTip("Loading: "&$sRoot&$sFolder)
                     ;GUICtrlSetData($hProgressRight, 0)
             EndSwitch
-            ToolTip("")
-            ConsoleWrite("Done: "&$hView&" >> "&$sRoot&$sFolder&@crlf)
+            ;ToolTip("")
+            ;ConsoleWrite("Done: "&$hView&" >> "&$sRoot&$sFolder&@crlf)
         EndIf
     EndFunc
 
@@ -279,8 +295,8 @@ $ownerLabelDataWidth = $aPos[2]
 GUISetFont(10.5,  $FW_NORMAL, 0, $MainFont)
 
 
-;$cListView = GUICtrlCreateListView("Type|Name|Access|Inherited|Applies to|Access Mask", 10, $ownerLabelPosV + 10, 2000, @DesktopHeight / 2.8, $LVS_SINGLESEL)
-$cListView = GUICtrlCreateListView("Type|Principal|Access|Inherited|Applies to|Propagate|ACCESS_MASK", 10, $ownerLabelPosV + 14, $aWinSize2[0] - 20, $aWinSize2[1] / 2.5, $LVS_SINGLESEL)
+;$cListView = GUICtrlCreateListView("Type|Principal|Access|Inherited|Applies to|Propagate|ACCESS_MASK", 10, $ownerLabelPosV + 14, $aWinSize2[0] - 20, $aWinSize2[1] / 2.5, $LVS_SINGLESEL)
+$cListView = GUICtrlCreateListView("Type|Principal|Access|Inherited|Applies to|Propagate", 10, $ownerLabelPosV + 14, $aWinSize2[0] - 20, $aWinSize2[1] / 2.5, $LVS_SINGLESEL)
 $exStyles = BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER)
 $hListView = GUICtrlGetHandle($cListView)
 $aPos = ControlGetPos($hGUI_1, "", $cListView)
@@ -354,7 +370,7 @@ GUICtrlSetState($AccessInfoData, $GUI_HIDE)
 
 GUISetFont(10.5,  $FW_NORMAL, 0, $MainFont)
 
-GUICtrlCreateLabel(" ", 100 - 10, $AccessInfoLabelPosV + 10 - 10, 1200, 800)
+;GUICtrlCreateLabel(" ", 100 - 10, $AccessInfoLabelPosV + 10 - 10, 1200, 800, $WS_BORDER)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 
 $ListviewMeasure = GUICtrlCreateCheckbox(" Create Folders / Append Data", 100, $AccessInfoLabelPosV + 80, -1, -1, $WS_BORDER)
@@ -366,7 +382,21 @@ $ListviewMeasurePosV = $aPos[1] + $aPos[3]
 $ListviewMeasureHeight = $aPos[3]
 $ListviewMeasureWidth = $aPos[2]
 
-$idListview = GUICtrlCreateListView("col1", 100, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, 400, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+
+$ListviewMeasure2 = GUICtrlCreateLabel("1" & @CRLF & "2" & @CRLF & "3" & @CRLF & "4" & @CRLF & "5" & @CRLF & "6" & @CRLF & "7" & @CRLF & @CRLF, 100, $AccessInfoLabelPosV + 80, -1, -1)
+GUICtrlSetState($ListviewMeasure2, $GUI_HIDE)
+$aPos = ControlGetPos($hGUI_1, "", $ListviewMeasure2)
+;MsgBox($MB_SYSTEMMODAL, "", "Position: " & $aPos[0] & ", " & $aPos[1] & @CRLF & "Size: " & $aPos[2] & ", " & $aPos[3])
+
+$ListviewMeasure2PosV = $aPos[1] + $aPos[3]
+$ListviewMeasure2Height = $aPos[3]
+$ListviewMeasure2Width = $aPos[2]
+
+
+GUICtrlCreateLabel(" ", 100 - 10, $AccessInfoLabelPosV + 30 - 2, $ListviewMeasureWidth * 3 + 60 + 120 + 40, $ListviewMeasure2Height + 100)
+;GUICtrlSetResizing(-1, $GUI_DOCKALL)
+
+$idListview = GUICtrlCreateListView("col1", 100, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
 _GUICtrlListView_SetView($idListview, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_ALL_ACCESS = GUICtrlCreateListViewItem(" Full Control", $idListview)
@@ -389,7 +419,7 @@ _GUICtrlListView_SetColumnWidth($idListview, 0, $LVSCW_AUTOSIZE_USEHEADER)
 GUICtrlSetState($idListview, $GUI_HIDE)
 
 
-$idListview2 = GUICtrlCreateListView("col1", 100 + $idListviewWidth + 40, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, 400, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$idListview2 = GUICtrlCreateListView("col1", 100 + $idListviewWidth + 40, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
 _GUICtrlListView_SetView($idListview2, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_WRITE_ATTRIBUTES = GUICtrlCreateListViewItem(" Write Attributes", $idListview2)
@@ -400,21 +430,38 @@ $sREAD_CONTROL = GUICtrlCreateListViewItem(" Read Permissions", $idListview2)
 $sWRITE_DAC = GUICtrlCreateListViewItem(" Change Permissions", $idListview2)
 $sWRITE_OWNER = GUICtrlCreateListViewItem(" Take Ownership", $idListview2)
 
+$aPos = ControlGetPos($hGUI_1, "", $idListview2)
+;MsgBox($MB_SYSTEMMODAL, "", "Position: " & $aPos[0] & ", " & $aPos[1] & @CRLF & "Size: " & $aPos[2] & ", " & $aPos[3])
+
+$idListview2PosV = $aPos[1] + $aPos[3]
+$idListview2PosH = $aPos[0] + $aPos[2]
+$idListview2Height = $aPos[3]
+$idListview2Width = $aPos[2]
+
 _GUICtrlListView_SetColumnWidth($idListview2, 0, $LVSCW_AUTOSIZE_USEHEADER)
 GUICtrlSetState($idListview2, $GUI_HIDE)
 
 
-$idListview3 = GUICtrlCreateListView("col1", 100 + $idListviewWidth + 40 + $idListviewWidth + 40, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, 400, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$idListview3 = GUICtrlCreateListView("col1", 100 + $idListviewWidth + 40 + $idListviewWidth + 40, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
 _GUICtrlListView_SetView($idListview3, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $IsPropagated = GUICtrlCreateListViewItem(" Propagate to child objects", $idListview3)
 
+$aPos = ControlGetPos($hGUI_1, "", $idListview3)
+;MsgBox($MB_SYSTEMMODAL, "", "Position: " & $aPos[0] & ", " & $aPos[1] & @CRLF & "Size: " & $aPos[2] & ", " & $aPos[3])
+
+$idListview3PosV = $aPos[1] + $aPos[3]
+$idListview3PosH = $aPos[0] + $aPos[2]
+$idListview3Height = $aPos[3]
+$idListview3Width = $aPos[2]
+
 _GUICtrlListView_SetColumnWidth($idListview3, 0, $LVSCW_AUTOSIZE_USEHEADER)
 GUICtrlSetState($idListview3, $GUI_HIDE)
 
+
 ; listviews for file ACL only
 
-$idListviewfile = GUICtrlCreateListView("col1", 100, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, 400, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$idListviewfile = GUICtrlCreateListView("col1", 100, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
 _GUICtrlListView_SetView($idListviewfile, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_ALL_ACCESSfile = GUICtrlCreateListViewItem(" Full Control", $idListviewfile)
@@ -437,7 +484,7 @@ _GUICtrlListView_SetColumnWidth($idListviewfile, 0, $LVSCW_AUTOSIZE_USEHEADER)
 GUICtrlSetState($idListviewfile, $GUI_HIDE)
 
 
-$idListviewfile2 = GUICtrlCreateListView("col1", 100 + $idListviewfileWidth + 80, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, 400, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$idListviewfile2 = GUICtrlCreateListView("col1", 100 + $idListviewfileWidth + 80, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
 _GUICtrlListView_SetView($idListviewfile2, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_WRITE_ATTRIBUTESfile = GUICtrlCreateListViewItem(" Write Attributes", $idListviewfile2)
@@ -507,8 +554,8 @@ ApplyBgColor()
 Func ApplyBgColor()
 
 If $isDarkMode = True Then
-    GUICtrlSetBkColor($ownerLabel, 0x303030)
-    GUICtrlSetBkColor($AccessInfoLabel, 0x303030)
+    GUICtrlSetBkColor($ownerLabel, 0x262626)
+    GUICtrlSetBkColor($AccessInfoLabel, 0x262626)
     GUICtrlSetBkColor($AccessInfoName, $GUI_BKCOLOR_TRANSPARENT)
     GUICtrlSetBkColor($AccessInfoData, $GUI_BKCOLOR_TRANSPARENT)
     GUICtrlSetBkColor($ownerLabelName, $GUI_BKCOLOR_TRANSPARENT)
@@ -533,6 +580,7 @@ $oldItem = ''
 
 $getInitialItem = _GUICtrlTreeView_GetSelection($hTreeViewRight)
 $newItem = _GUICtrlTreeView_GetText($hTreeViewRight, $getInitialItem)
+$displaySelected = $newItem
 CheckFileSystem()
 
 
@@ -623,8 +671,8 @@ Func GetPermissions()
     $FileOrFolder = FileGetAttrib ($newItem)
     $isFolder = StringInStr($FileOrFolder, "D")
     ;ConsoleWrite($newItem & ' info: ' & $FileOrFolder & @CRLF)
-    $getSelectedItem = _GUICtrlTreeView_GetSelection($hTreeViewRight)
-    $displaySelected = _GUICtrlTreeView_GetText($hTreeViewRight, $getSelectedItem)
+    ;$getSelectedItem = _GUICtrlTreeView_GetSelection($hTreeViewRight)
+    ;$displaySelected = _GUICtrlTreeView_GetText($hTreeViewRight, $getSelectedItem)
 
 
     Global $oOwner = _GetObjectOwner($newItem)
@@ -800,7 +848,7 @@ Func GetPermissions()
     $aOldArray = _Reverse2DArray($aUniques)
 
     _GUICtrlListView_AddArray($hListView,$aOldArray)
-    _GUICtrlListView_HideColumn($cListView, 6)
+    ;_GUICtrlListView_HideColumn($cListView, 6)
     ;If $isFolder = 0 Then _GUICtrlListView_HideColumn($cListView, 4)
     hListViewRefreshColWidth()
 
@@ -836,14 +884,14 @@ Func _Reverse2DArray($aArray)
     Local $aTemp[$rows][$columns]
     
     For $Y = 0 to $rows-1
-        ConsoleWrite("Row " & $Y & ": ")
+        ;ConsoleWrite("Row " & $Y & ": ")
         
         For $X = 0 to $columns-1
             $aTemp[$Y][$X] = $aArray[$rows - $Y - 1][$X]
             
-            ConsoleWrite("Column " & $X & ": " & $aArray[$Y][$X] & ", ")
+            ;ConsoleWrite("Column " & $X & ": " & $aArray[$Y][$X] & ", ")
         Next
-        ConsoleWrite(@CRLF)
+        ;ConsoleWrite(@CRLF)
     Next
     Return $aTemp
 EndFunc
@@ -1248,8 +1296,14 @@ Func WM_NOTIFY2backgood($hWnd, $iMsg, $iwParam, $ilParam)
                     Else
                         GUICtrlSetState($IsPropagated, $GUI_UNCHECKED)
                     EndIf
-                    $AccessMaskBits = _GUICtrlListView_GetItemText($cListView, $iItem, 6)
+                    
+                    ; Grab ACCESS_MASK from listview
+                    ;$AccessMaskBits = _GUICtrlListView_GetItemText($cListView, $iItem, 6)
+                    
+                    ; Grab ACCESS_MASK from array
+                    $AccessMaskBits = $aOldArray[$iItem][6]
                     $permoutput = ParseAccessMaskBits()
+                    
                     ; folder listview acl
                     GUICtrlSetState($sFILE_ALL_ACCESS, $GUI_UNCHECKED)
                     GUICtrlSetState($sFILE_EXECUTE, $GUI_UNCHECKED)
@@ -1544,6 +1598,43 @@ Func _BGR2RGB($iColor)
     Return BitOR(BitShift(BitAND($iColor, 0x0000FF), -16), BitAND($iColor, 0x00FF00), BitShift(BitAND($iColor, 0xFF0000), 16))
 EndFunc   ;==>_BGR2RGB
 
+
+Func RefreshTV()
+    
+    __TreeListExplorer_Reload($hTLESystemRight, True)
+
+    #cs
+    ;MsgBox($MB_SYSTEMMODAL, "Title", "Refreshing Treeview initiated: " & $expandedItem)
+
+    ; Store last selection
+    ; Last selection already stored as $newItem
+    Local $sDrive2 = "", $sDir2 = "", $sFileName2 = "", $sExtension2 = ""
+    Local $aPathSplit2 = _PathSplit($newItem, $sDrive2, $sDir2, $sFileName2, $sExtension2)
+    ;_ArrayDisplay($aPathSplit2, "_PathSplit")
+
+    $restoreSel = $aPathSplit2[1] & $aPathSplit2[2]
+
+    ;MsgBox($MB_SYSTEMMODAL, "Title", "Previous: " & $restoreSel)
+    
+
+    ; Removes the TLE system and clears the Tree/Listview
+    __TreeListExplorer_DeleteSystem($hTLESystemRight)
+    __TreeListExplorer_RemoveView($hTreeViewRight)
+
+    ; Create TLE system for the right side
+    Global $hTLESystemRight = __TreeListExplorer_CreateSystem($hGUI_1, "", "_currentFolder")
+    If @error Then ConsoleWrite("__TreeListExplorer_CreateSystem failed: "&@error&":"&@extended&@crlf)
+
+    ; Add Views to TLE system: ShowFolders=True, ShowFiles=True
+    __TreeListExplorer_AddView($hTLESystemRight, $hTreeViewRight, True, True, "_clickCallback", "_doubleClickCallback", "_loadingCallback", "_selectCallback")
+    If @error Then ConsoleWrite("__TreeListExplorer_AddView $hTreeView failed: "&@error&":"&@extended&@crlf)
+
+    ; Restore previous selection
+    __TreeListExplorer_OpenPath($hTLESystemRight, $restoreSel)
+    ;__TreeListExplorer_OpenPath($hTLESystemRight, 'C:\Users\tiffanyanddave')
+    If @error Then ConsoleWrite("__TreeListExplorer_OpenPath failed: "&@error&":"&@extended&@crlf)
+    #ce
+EndFunc
 
 
 while True
