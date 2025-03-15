@@ -38,8 +38,8 @@ Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Description=ACL Viewer
 #AutoIt3Wrapper_res_requestedExecutionLevel=requireAdministrator
-#AutoIt3Wrapper_Res_Fileversion=1.1.0
-#AutoIt3Wrapper_Res_ProductVersion=1.1.0
+#AutoIt3Wrapper_Res_Fileversion=1.2.0
+#AutoIt3Wrapper_Res_ProductVersion=1.2.0
 #AutoIt3Wrapper_Res_ProductName=ACLViewer
 #AutoIt3Wrapper_Outfile_x64=ACLViewer.exe
 #AutoIt3Wrapper_OutFile_x86=ACLViewer.exe
@@ -748,6 +748,7 @@ Func GetPermissions()
         ; parse access type
         $aOldArray[$i][1] = StringReplace($aOldArray[$i][1], '0', 'Allow ', 0)
         $aOldArray[$i][1] = StringReplace($aOldArray[$i][1], '1', 'Deny ', 0)
+        $aOldArray[$i][1] = StringReplace($aOldArray[$i][1], '9', 'Allow ', 0)
 
         ; Parse SIDs
         $aOldArray[$i][0] = StringReplace($aOldArray[$i][0], 'APPLICATION PACKAGE AUTHORITY\', '')
@@ -767,13 +768,22 @@ Func GetPermissions()
         ; get basic permission from access mask
         If $aOldArray[$i][5] = '00000000000111110000000111111111' Then $aOldArray[$i][2] = 'Full Control'
         If $aOldArray[$i][5] = '00010000000000000000000000000000' Then $aOldArray[$i][2] = 'Full Control'
+        If $aOldArray[$i][5] = '00010000000111110000000111111111' Then $aOldArray[$i][2] = 'Full Control'
+        If $aOldArray[$i][5] = '11110000000000000000000000000000' Then $aOldArray[$i][2] = 'Full Control'
         If $aOldArray[$i][5] = '10100000000000000000000000000000' Then $aOldArray[$i][2] = 'Read & Execute'
         If $aOldArray[$i][5] = '00000000000100100000000010101001' Then $aOldArray[$i][2] = 'Read & Execute'
         If $aOldArray[$i][5] = '00000000000100110000000110111111' Then $aOldArray[$i][2] = 'Modify'
         If $aOldArray[$i][5] = '11100000000000010000000000000000' Then $aOldArray[$i][2] = 'Modify'
         If $aOldArray[$i][5] = '00000000000000000000000100010110' Then $aOldArray[$i][2] = 'Write'
         If $aOldArray[$i][5] = '00000000000100100000000010001001' Then $aOldArray[$i][2] = 'Read'
+        If $aOldArray[$i][5] = '10000000000000000000000000000000' Then $aOldArray[$i][2] = 'Read'
+        If $aOldArray[$i][5] = '10000000000100100000000010001001' Then $aOldArray[$i][2] = 'Read'
+        If $aOldArray[$i][5] = '00000000000000010000000000000000' Then $aOldArray[$i][2] = 'Delete'
         If $aOldArray[$i][5] = '00000000000000000000000000000001' Then $aOldArray[$i][2] = 'List folder contents'
+        If $aOldArray[$i][5] = '00000000000100100000000110111111' Then $aOldArray[$i][2] = 'Read, write & execute'
+        If $aOldArray[$i][5] = '11100000000000000000000000000000' Then $aOldArray[$i][2] = 'Read, write & execute'
+        If $aOldArray[$i][5] = '00000000000000000000000000100000' Then $aOldArray[$i][2] = 'Traverse folder / execute file'
+        If $aOldArray[$i][5] = '00000000000100100000000010100000' Then $aOldArray[$i][2] = 'Traverse / execute'
 
         If $aOldArray[$i][5] = '00000000000100000000000000100001' Then $aOldArray[$i][2] = 'Special'
         If $aOldArray[$i][5] = '00000000000100100000000010101111' Then $aOldArray[$i][2] = 'Special'
@@ -782,6 +792,15 @@ Func GetPermissions()
         If $aOldArray[$i][5] = '00000000000100000000000000100000' Then $aOldArray[$i][2] = 'Special'
         If $aOldArray[$i][5] = '00000000000100110000000111111111' Then $aOldArray[$i][2] = 'Special'
         If $aOldArray[$i][5] = '00000000000000010000000001000000' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '00000000000100100000000010101011' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '00000000000100000000000000100110' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '00000000000100100000000110011111' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '11000000000000000000000000000000' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '00000000000100110000000110011111' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '11000000000000010000000000000000' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '00000000000100100000000000100000' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '00000000000100100000000100010110' Then $aOldArray[$i][2] = 'Special'
+        If $aOldArray[$i][5] = '00000000000111110000000110011111' Then $aOldArray[$i][2] = 'Special'
 ;#cs
         ; parse inheritance flags
         If $aOldArray[$i][3] = '10' Then $aOldArray[$i][6] = 'True'
@@ -815,6 +834,10 @@ Func GetPermissions()
         If $aOldArray[$i][3] = '27' Then
             $aOldArray[$i][3] = 'This folder, subfolders and files'
             $aOldArray[$i][4] = 'True'
+            $aOldArray[$i][6] = 'True'
+        EndIf
+        If $aOldArray[$i][3] = '9' Then
+            $aOldArray[$i][3] = 'Files only'
             $aOldArray[$i][6] = 'True'
         EndIf
         If $aOldArray[$i][3] = '0' Then $aOldArray[$i][3] = 'This folder only'
@@ -1629,10 +1652,6 @@ Func RefreshTV()
     __TreeListExplorer_AddView($hTLESystemRight, $hTreeViewRight, True, True, "_clickCallback", "_doubleClickCallback", "_loadingCallback", "_selectCallback")
     If @error Then ConsoleWrite("__TreeListExplorer_AddView $hTreeView failed: "&@error&":"&@extended&@crlf)
 
-    ; Restore previous selection
-    __TreeListExplorer_OpenPath($hTLESystemRight, $restoreSel)
-    ;__TreeListExplorer_OpenPath($hTLESystemRight, 'C:\Users\tiffanyanddave')
-    If @error Then ConsoleWrite("__TreeListExplorer_OpenPath failed: "&@error&":"&@extended&@crlf)
     #ce
 EndFunc
 
