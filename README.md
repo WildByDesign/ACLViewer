@@ -16,7 +16,7 @@ ACL Viewer for Windows
 - Add a Hotkey to toggle hiding/unhiding Inherited ACEs
 - Consider changing the labels to edit boxes to easily copy details from
 
-# Screenshot
+# Screenshots
 
 ![ACLViewer-2 0](https://github.com/user-attachments/assets/aca2eac0-a9a9-4569-821f-789049a2ddd8)
 
