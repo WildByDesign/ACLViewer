@@ -24,8 +24,10 @@
 #include <WinAPIInternals.au3>
 #include <EditConstants.au3>
 #include <File.au3>
+#include <FileConstants.au3>
 #include <StringConstants.au3>
 #include <Misc.au3>
+#include <String.au3>
 Global $isDarkMode = False
 Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 #include "include\GUIFrame.au3"
@@ -38,8 +40,8 @@ Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Description=ACL Viewer
 #AutoIt3Wrapper_res_requestedExecutionLevel=requireAdministrator
-#AutoIt3Wrapper_Res_Fileversion=1.2.0
-#AutoIt3Wrapper_Res_ProductVersion=1.2.0
+#AutoIt3Wrapper_Res_Fileversion=2.0.0
+#AutoIt3Wrapper_Res_ProductVersion=2.0.0
 #AutoIt3Wrapper_Res_ProductName=ACLViewer
 #AutoIt3Wrapper_Outfile_x64=ACLViewer.exe
 #AutoIt3Wrapper_OutFile_x86=ACLViewer.exe
@@ -66,10 +68,9 @@ If @Compiled = 0 Then
 	DllCall("User32.dll", "bool", "SetProcessDpiAwarenessContext" , "HWND", "DPI_AWARENESS_CONTEXT" -4)
 EndIf
 
-;Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 Global $sRootFolder = StringLeft(@AutoItExe, StringInStr(@AutoItExe, "\", Default, -1))
 ;ConsoleWrite($sRootFolder & @CRLF)
-Global $oOwner, $aAcct, $AccessMaskBits, $sFolder, $expandedItem, $displaySelected
+Global $oOwner, $aAcct, $AccessMaskBits, $sFolder, $expandedItem, $displaySelected, $sDisplayOwner
 Global $b00, $b01, $b02, $b03, $b04, $b05, $b06, $b07, $b08, $b09, $b10, $b11, $b12, $b13, $b14, $b15, $b16, $b17, $b18, $b19, $b20, $b21, $b22, $b23, $b24, $b25, $b26, $b27, $b28, $b29, $b30, $b31
 
 $GetDPI = _GetDPI()
@@ -196,32 +197,18 @@ GUISetFont(10.5,  $FW_NORMAL, 0, $MainFont)
 Global $hTreeViewRight = GUICtrlCreateTreeView(10,15,$aWinSize1[0] - 10, $aWinSize1[1] - 15)
 
 ; Create TLE system for the right side
-Global $hTLESystemRight = __TreeListExplorer_CreateSystem($hGUI_1, "", "_currentFolder", "_selectCallback")
+Global $hTLESystemRight = __TreeListExplorer_CreateSystem($hGUI_1, "", Default, "_selectCallback")
 If @error Then ConsoleWrite("__TreeListExplorer_CreateSystem failed: "&@error&":"&@extended&@crlf)
 
 ; Add Views to TLE system: ShowFolders=True, ShowFiles=True
-__TreeListExplorer_AddView($hTLESystemRight, $hTreeViewRight, True, True, "_clickCallback", "_doubleClickCallback", "_loadingCallback")
+__TreeListExplorer_AddView($hTLESystemRight, $hTreeViewRight, True, True)
 If @error Then ConsoleWrite("__TreeListExplorer_AddView $hTreeView failed: "&@error&":"&@extended&@crlf)
 
 
-; Set the root directory for the right side to the users directory
-;__TreeListExplorer_SetRoot($hTLESystemRight, "C:\Users")
-;If @error Then ConsoleWrite("__TreeListExplorer_SetRoot failed: "&@error&":"&@extended&@crlf)
-; Open the User profile on the right side
-;__TreeListExplorer_OpenPath($hTLESystemRight, 'C:\')
-;If @error Then ConsoleWrite("__TreeListExplorer_OpenPath failed: "&@error&":"&@extended&@crlf)
-
     Func _currentFolder($hSystem, $sRoot, $sFolder, $sSelected)
-        ;GUICtrlSetData($hLabelCurrentFolderRight, $sRoot&$sFolder&"["&$sSelected&"]")
-        ; ConsoleWrite("Folder "&$hSystem&": "&$sRoot&$sFolder&"["&$sSelected&"]"&@CRLF)
     EndFunc
     
     Func _selectCallback($hSystem, $sRoot, $sFolder, $sSelected)
-        ;GUICtrlSetData($hLabelSelectRight, $sRoot&$sFolder&"["&$sSelected&"]")
-        ;ConsoleWrite("MyData: " & $sRoot&$sFolder&"["&$sSelected&"]" & @CRLF)
-        ;ConsoleWrite("MyData: " & $sRoot&$sFolder & @CRLF)
-        ; ConsoleWrite("Select "&$hSystem&": "&$sRoot&$sFolder&"["&$sSelected&"]"&@CRLF)
-        ;__TreeListExplorer__FileGetIconIndex($sRoot&$sFolder&$sSelected)
         $newItem = $sRoot&$sFolder&$sSelected
         $displaySelected = $sSelected
         treeviewChangesfunc()
@@ -292,11 +279,11 @@ $ownerLabelDataHeight = $aPos[3]
 $ownerLabelDataWidth = $aPos[2]
 
 
-GUISetFont(10.5,  $FW_NORMAL, 0, $MainFont)
+GUISetFont(10.5, $FW_NORMAL, 0, $MainFont)
 
 
 ;$cListView = GUICtrlCreateListView("Type|Principal|Access|Inherited|Applies to|Propagate|ACCESS_MASK", 10, $ownerLabelPosV + 14, $aWinSize2[0] - 20, $aWinSize2[1] / 2.5, $LVS_SINGLESEL)
-$cListView = GUICtrlCreateListView("Type|Principal|Access|Inherited|Applies to|Propagate", 10, $ownerLabelPosV + 14, $aWinSize2[0] - 20, $aWinSize2[1] / 2.5, $LVS_SINGLESEL)
+$cListView = GUICtrlCreateListView("Type|Principal|Access|Inherited|Applies to|Propagate", 10, $ownerLabelPosV + 14, $aWinSize2[0] - 20, $aWinSize2[1] / 2.8, $LVS_SINGLESEL)
 $exStyles = BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER)
 $hListView = GUICtrlGetHandle($cListView)
 $aPos = ControlGetPos($hGUI_1, "", $cListView)
@@ -308,10 +295,32 @@ $cListViewWidth = $aPos[2]
 _GUICtrlListView_SetExtendedListViewStyle($hListView, $exStyles)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 
+
+GUISetFont(8.5, $FW_NORMAL, $GUI_FONTUNDER, $MainFont)
+
+
+$exportCSVLabel = GUICtrlCreateLabel("Export ListView as CSV", $aWinSize2[1] - 100, $cListViewPosV + 6, -1, -1)
+GUICtrlSetColor($exportCSVLabel, 0x1E90FF)
+$hexportCSVLabel = GUICtrlGetHandle($exportCSVLabel)
+$aPos = ControlGetPos($hGUI_1, "", $exportCSVLabel)
+;MsgBox($MB_SYSTEMMODAL, "", "Position: " & $aPos[0] & ", " & $aPos[1] & @CRLF & "Size: " & $aPos[2] & ", " & $aPos[3])
+
+$exportCSVLabelPosV = $aPos[1] + $aPos[3]
+$exportCSVLabelPosV2 = $aPos[1]
+$exportCSVLabelHeight = $aPos[3]
+$exportCSVLabelWidth = $aPos[2]
+
+
+$verboseACELabel = GUICtrlCreateLabel("Verbose ACE Permissions", $aWinSize2[1] - 100 + $exportCSVLabelWidth + 10, $cListViewPosV + 6, -1, -1)
+GUICtrlSetColor($verboseACELabel, 0x1E90FF)
+$hverboseACELabel = GUICtrlGetHandle($verboseACELabel)
+GUICtrlSetState($verboseACELabel, $GUI_HIDE)
+
+
 GUISetFont(14, $FW_NORMAL, $GUI_FONTITALIC, $MainFont)
 
 ;$OutputText = GUICtrlCreateInput("", 100, $cListViewPosV + 20, 800, @DesktopHeight / 2.2, $ES_MULTILINE + $ES_AUTOVSCROLL, -1)
-$OutputText = GUICtrlCreateEdit("", 100, $cListViewPosV + 20, 800, $aWinSize2[1] / 2, BitOr($ES_AUTOVSCROLL, $WS_VSCROLL), 0)
+$OutputText = GUICtrlCreateEdit("", 100, $exportCSVLabelPosV + 4, $aWinSize2[1] / 1.4, $aWinSize2[1] / 2, BitOr($ES_AUTOVSCROLL, $WS_VSCROLL), 0)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 
 $selectACE = GUICtrlCreateLabel("Select an ACE", 100, $cListViewPosV + 30)
@@ -331,7 +340,7 @@ GUISetFont(10.5,  $FW_NORMAL, 0, $MainFont)
 ;$AccessInfo = @TAB & 'Type:' & @CRLF & @TAB & 'Principal:' & @CRLF & @TAB & 'Applies to:'
 ;$AccessInfoLabel = GUICtrlCreateLabel($AccessInfo, 10, $cListViewPosV + 15, $aWinSize2[0] - 20, -1, $WS_BORDER)
 $AccessInfo = ' ' & @CRLF & ' ' & @CRLF & ' '
-$AccessInfoLabel = GUICtrlCreateLabel($AccessInfo, 10, $cListViewPosV + 15, $aWinSize2[0] - 20, -1, $WS_BORDER)
+$AccessInfoLabel = GUICtrlCreateLabel($AccessInfo, 10, $exportCSVLabelPosV + 4, $aWinSize2[0] - 20, -1, $WS_BORDER)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $aPos = ControlGetPos($hGUI_1, "", $AccessInfoLabel)
 ;MsgBox($MB_SYSTEMMODAL, "", "Position: " & $aPos[0] & ", " & $aPos[1] & @CRLF & "Size: " & $aPos[2] & ", " & $aPos[3])
@@ -393,7 +402,7 @@ $ListviewMeasure2Height = $aPos[3]
 $ListviewMeasure2Width = $aPos[2]
 
 
-GUICtrlCreateLabel(" ", 100 - 10, $AccessInfoLabelPosV + 30 - 2, $ListviewMeasureWidth * 3 + 60 + 120 + 40, $ListviewMeasure2Height + 100)
+$BlockLVLabel = GUICtrlCreateLabel(" ", 100 - 10, $AccessInfoLabelPosV + 30 - 2, $ListviewMeasureWidth * 3 + 60 + 120 + 40, $ListviewMeasure2Height + 100)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 
 $idListview = GUICtrlCreateListView("col1", 100, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
@@ -560,6 +569,8 @@ If $isDarkMode = True Then
     GUICtrlSetBkColor($AccessInfoData, $GUI_BKCOLOR_TRANSPARENT)
     GUICtrlSetBkColor($ownerLabelName, $GUI_BKCOLOR_TRANSPARENT)
     GUICtrlSetBkColor($ownerLabelData, $GUI_BKCOLOR_TRANSPARENT)
+    GUICtrlSetColor($exportCSVLabel, 0x1E90FF)
+    GUICtrlSetColor($verboseACELabel, 0x1E90FF)
     ;GUICtrlSetBkColor($idListview, 0x303030)
 Else
     GUICtrlSetBkColor($ownerLabel, 0xE5E4E2)
@@ -568,6 +579,8 @@ Else
     GUICtrlSetBkColor($AccessInfoData, $GUI_BKCOLOR_TRANSPARENT)
     GUICtrlSetBkColor($ownerLabelName, $GUI_BKCOLOR_TRANSPARENT)
     GUICtrlSetBkColor($ownerLabelData, $GUI_BKCOLOR_TRANSPARENT)
+    GUICtrlSetColor($exportCSVLabel, 0x1E90FF)
+    GUICtrlSetColor($verboseACELabel, 0x1E90FF)
 EndIf
 
 Endfunc
@@ -577,6 +590,13 @@ $oldItem = ''
 ;$newItem = 'C:\'
 ;Sleep(5000)
 ;CheckFileSystem()
+
+; Set the root directory for all drives
+__TreeListExplorer_SetRoot($hTLESystemRight, "")
+If @error Then ConsoleWrite("__TreeListExplorer_SetRoot failed: "&@error&":"&@extended&@crlf)
+; Select the users' home drive for initial view
+__TreeListExplorer_OpenPath($hTLESystemRight, @HomeDrive)
+If @error Then ConsoleWrite("__TreeListExplorer_OpenPath failed: "&@error&":"&@extended&@crlf)
 
 $getInitialItem = _GUICtrlTreeView_GetSelection($hTreeViewRight)
 $newItem = _GUICtrlTreeView_GetText($hTreeViewRight, $getInitialItem)
@@ -622,6 +642,8 @@ Func treeviewChangesfunc()
         ;MsgBox($MB_SYSTEMMODAL, "test", $newItem)
         ;GUICtrlDelete($OutputText)
         ;GUICtrlSetData($OutputText, "")
+        GUICtrlSetState($verboseACELabel, $GUI_HIDE)
+        GUICtrlSetState($OutputText, $GUI_HIDE)
         GUICtrlSetState($selectACE, $GUI_SHOW)
         GUICtrlSetState($idListview, $GUI_HIDE)
         GUICtrlSetState($idListview2, $GUI_HIDE)
@@ -677,7 +699,7 @@ Func GetPermissions()
 
     Global $oOwner = _GetObjectOwner($newItem)
     ;If @error Then GUICtrlSetData($ownerLabel, @TAB & "Object Name:" & @TAB & $displaySelected & @CRLF & @TAB & "Owner Name:" & @TAB & 'Error')
-    If @error Then GUICtrlSetData($ownerLabelData, $displaySelected & @CRLF & 'Error')
+    If @error Then GUICtrlSetData($ownerLabelData, $displaySelected & @CRLF & ' ')
     Global $Dacl = _GetObjectDacl($newItem)
     If @error Then
         GUICtrlSetData($ErrorAce, "Error")
@@ -699,9 +721,11 @@ Func GetPermissions()
         $sAcct = ($aAcct[1] <> "" ? $aAcct[1] & "\" : "" ) & $aAcct[0]
         ;GUICtrlSetData($ownerLabel, @TAB & "Object Name:" & @TAB & $displaySelected & @CRLF & @TAB & "Owner Name:" & @TAB & $sAcct)
         GUICtrlSetData($ownerLabelData, $displaySelected & @CRLF & $sAcct)
+        $sDisplayOwner = $sAcct
     Else
         ;GUICtrlSetData($ownerLabel, @TAB & "Object Name:" & @TAB & $displaySelected & @CRLF & @TAB & "Owner Name:" & @TAB & $oOwner)
         GUICtrlSetData($ownerLabelData, $displaySelected & @CRLF & $oOwner)
+        $sDisplayOwner = $oOwner
     EndIf
     
     Global $aOldArray[0][8]
@@ -1135,6 +1159,17 @@ Func ParseAccessMaskBits()
     If $b01 = 1 Then $hBitListItems[1] = "FILE_WRITE_DATA" & @TAB & @TAB & @TAB & "(0x2)"
     If $b00 = 1 Then $hBitListItems[0] = "FILE_READ_DATA" & @TAB & @TAB & @TAB & "(0x1)"
 
+    ; Obtain STANDARD_RIGHTS_READ (0x20000)
+    ; Obtain STANDARD_RIGHTS_WRITE (0x20000)
+    ; Obtain STANDARD_RIGHTS_EXECUTE (0x20000)
+    ; Requires READ_CONTROL
+    Local $sSTANDARD_RIGHTS_READ, $sSTANDARD_RIGHTS_WRITE, $sSTANDARD_RIGHTS_EXECUTE
+    If $hBitListItems[17] <> "" Then
+        $sSTANDARD_RIGHTS_READ = True
+        $sSTANDARD_RIGHTS_WRITE = True
+        $sSTANDARD_RIGHTS_EXECUTE = True
+    EndIf
+
     ; Obtain STANDARD_RIGHTS_REQUIRED (0xf0000)
     ; Requires DELETE, READ_CONTROL, WRITE_DAC and WRITE_OWNER
     Local $sSTANDARD_RIGHTS_REQUIRED
@@ -1177,6 +1212,11 @@ Func ParseAccessMaskBits()
     Next
     $sSpecificRights = _ArrayToString($aSpecificRights, ",")
     $sSpecificRights = StringReplace($sSpecificRights, ",", @CRLF)
+    If $sFILE_GENERIC_EXECUTE = True Then $sSpecificRights = _StringInsert($sSpecificRights, "FILE_GENERIC_EXECUTE" & @TAB & @TAB & "(0x1200a0)" & @CRLF, 0)
+    If $sFILE_GENERIC_READ = True Then $sSpecificRights = _StringInsert($sSpecificRights, "FILE_GENERIC_READ" & @TAB & @TAB & "(0x120089)" & @CRLF, 0)
+    If $sFILE_GENERIC_WRITE = True Then $sSpecificRights = _StringInsert($sSpecificRights, "FILE_GENERIC_WRITE" & @TAB & @TAB & "(0x120116)" & @CRLF, 0)
+    If $sFILE_ALL_ACCESS = True Then $sSpecificRights = _StringInsert($sSpecificRights, "FILE_ALL_ACCESS" & @TAB & @TAB & @TAB & "(0x1f01ff)" & @CRLF, 0)
+
     If $sSpecificRights = "" Then
         $sSpecificRights = ""
     Else
@@ -1195,6 +1235,12 @@ Func ParseAccessMaskBits()
     Next
     $sStandardRights = _ArrayToString($aStandardRights, ",")
     $sStandardRights = StringReplace($sStandardRights, ",", @CRLF)
+    If $sSTANDARD_RIGHTS_READ = True Then $sStandardRights = _StringInsert($sStandardRights, "STANDARD_RIGHTS_READ" & @TAB & @TAB & "(0x20000)" & @CRLF, 0)
+    If $sSTANDARD_RIGHTS_WRITE = True Then $sStandardRights = _StringInsert($sStandardRights, "STANDARD_RIGHTS_WRITE" & @TAB & @TAB & "(0x20000)" & @CRLF, 0)
+    If $sSTANDARD_RIGHTS_EXECUTE = True Then $sStandardRights = _StringInsert($sStandardRights, "STANDARD_RIGHTS_EXECUTE" & @TAB & @TAB & "(0x20000)" & @CRLF, 0)
+    If $sSTANDARD_RIGHTS_REQUIRED = True Then $sStandardRights = _StringInsert($sStandardRights, "STANDARD_RIGHTS_REQUIRED" & @TAB & "(0xf0000)" & @CRLF, 0)
+    If $sSTANDARD_RIGHTS_ALL = True Then $sStandardRights = _StringInsert($sStandardRights, "STANDARD_RIGHTS_ALL" & @TAB & @TAB & "(0x1f0000)" & @CRLF, 0)
+
     If $sStandardRights = "" Then
         $sStandardRights = ""
     Else
@@ -1213,14 +1259,7 @@ Func ParseAccessMaskBits()
     Next
     $sGenericRights = _ArrayToString($aGenericRights, ",")
     $sGenericRights = StringReplace($sGenericRights, ",", @CRLF)
-
-    If $sFILE_GENERIC_EXECUTE = True Then $sGenericRights = $sGenericRights & "FILE_GENERIC_EXECUTE" & @TAB & @TAB & "(0x1200a0)" & @CRLF
-    If $sFILE_GENERIC_READ = True Then $sGenericRights = $sGenericRights & "FILE_GENERIC_READ" & @TAB & @TAB & "(0x120089)" & @CRLF
-    If $sFILE_GENERIC_WRITE = True Then $sGenericRights = $sGenericRights & "FILE_GENERIC_WRITE" & @TAB & @TAB & "(0x120116)" & @CRLF
-    If $sFILE_ALL_ACCESS = True Then $sGenericRights = $sGenericRights & "FILE_ALL_ACCESS" & @TAB & @TAB & @TAB & "(0x1f01ff)" & @CRLF
-    
-    If $sSTANDARD_RIGHTS_REQUIRED = True Then $sStandardRights = $sStandardRights & "STANDARD_RIGHTS_REQUIRED" & @TAB & "(0xf0000)" & @CRLF
-    If $sSTANDARD_RIGHTS_ALL = True Then $sStandardRights = $sStandardRights & "STANDARD_RIGHTS_ALL" & @TAB & @TAB & "(0x1f0000)" & @CRLF
+ 
 
     If $sGenericRights = "" Then
         $sGenericRights = ""
@@ -1279,7 +1318,10 @@ Func WM_NOTIFY2backgood($hWnd, $iMsg, $iwParam, $ilParam)
                         ;ConsoleWrite("---> Item " & $iItem + 1 & " has checked" & @LF)
                         ;ConsoleWrite("Text: " & _GUICtrlListView_GetItemText($cListView, $iItem, 6) & @LF)
                     ;EndIf
+                    GUICtrlSetState($BlockLVLabel, $GUI_SHOW)
+                    GUICtrlSetState($verboseACELabel, $GUI_SHOW)
                     GUICtrlSetState($selectACE, $GUI_HIDE)
+                    GUICtrlSetState($OutputText, $GUI_HIDE)
                     ;GUICtrlSetState($OutputText, $GUI_SHOW)
                     If $isFolder Then
                         GUICtrlSetState($idListview, $GUI_SHOW)
@@ -1357,13 +1399,14 @@ Func WM_NOTIFY2backgood($hWnd, $iMsg, $iwParam, $ilParam)
                     Else
                         GUICtrlSetState($sREAD_CONTROL, $GUI_UNCHECKED)
                     EndIf
-                    If StringInStr($permoutput, "FILE_DELETE_CHILD") Then
+                    ;If StringInStr($permoutput, "FILE_DELETE_CHILD") Then
+                    If StringInStr($permoutput, "FILE_DELETE_CHILD" & @TAB & @TAB & "(0x40)") Then
                         GUICtrlSetState($sFILE_DELETE_CHILD, $GUI_CHECKED)
-                        $permoutput = StringReplace($permoutput, "FILE_DELETE_CHILD", "")
+                        ;$permoutput = StringReplace($permoutput, "FILE_DELETE_CHILD", "")
                     Else
                         GUICtrlSetState($sFILE_DELETE_CHILD, $GUI_UNCHECKED)
                     EndIf
-                    If StringInStr($permoutput, "DELETE") Then
+                    If StringInStr($permoutput, "DELETE" & @TAB & @TAB & @TAB & @TAB & "(0x10000)") Then
                         GUICtrlSetState($sFILE_DELETE, $GUI_CHECKED)
                     Else
                         GUICtrlSetState($sFILE_DELETE, $GUI_UNCHECKED)
@@ -1477,13 +1520,15 @@ Func WM_NOTIFY2backgood($hWnd, $iMsg, $iwParam, $ilParam)
                     Else
                         GUICtrlSetState($sREAD_CONTROLfile, $GUI_UNCHECKED)
                     EndIf
-                    If StringInStr($permoutput, "FILE_DELETE_CHILD") Then
+                    ;If StringInStr($permoutput, "FILE_DELETE_CHILD") Then
+                    If StringInStr($permoutput, "FILE_DELETE_CHILD" & @TAB & @TAB & "(0x40)") Then
                     ;    GUICtrlSetState($sFILE_DELETE_CHILD, $GUI_CHECKED)
-                        $permoutput = StringReplace($permoutput, "FILE_DELETE_CHILD", "")
+                        ;MsgBox($MB_SYSTEMMODAL, "Title", "We found a match!")
+                        ;$permoutput = StringReplace($permoutput, "FILE_DELETE_CHILD", "")
                     ;Else
                     ;    GUICtrlSetState($sFILE_DELETE_CHILD, $GUI_UNCHECKED)
                     EndIf
-                    If StringInStr($permoutput, "DELETE") Then
+                    If StringInStr($permoutput, "DELETE" & @TAB & @TAB & @TAB & @TAB & "(0x10000)") Then
                         GUICtrlSetState($sFILE_DELETEfile, $GUI_CHECKED)
                     Else
                         GUICtrlSetState($sFILE_DELETEfile, $GUI_UNCHECKED)
@@ -1623,36 +1668,56 @@ EndFunc   ;==>_BGR2RGB
 
 
 Func RefreshTV()
-    
+    ;__TreeListExplorer_FreeIconCache()
     __TreeListExplorer_Reload($hTLESystemRight, True)
+EndFunc
 
-    #cs
-    ;MsgBox($MB_SYSTEMMODAL, "Title", "Refreshing Treeview initiated: " & $expandedItem)
 
-    ; Store last selection
-    ; Last selection already stored as $newItem
-    Local $sDrive2 = "", $sDir2 = "", $sFileName2 = "", $sExtension2 = ""
-    Local $aPathSplit2 = _PathSplit($newItem, $sDrive2, $sDir2, $sFileName2, $sExtension2)
-    ;_ArrayDisplay($aPathSplit2, "_PathSplit")
+Func ExportToCSV()
+    Local Const $sMessage = "Choose a filename."
+    Local $aNewArray = $aOldArray
+    _ArrayColDelete($aNewArray, 7)
+    _ArrayColDelete($aNewArray, 6)
+    Local $sFill = "Type:|Principal:|Access:|Inherited:|Applies to:|Propagate:"
+    _ArrayInsert($aNewArray, "0")
+    _ArrayInsert($aNewArray, "0", $sFill)
+    _ArrayInsert($aNewArray, "0")
+    Local $sFill2 = "Owner Name:" & "|" & $sDisplayOwner
+    _ArrayInsert($aNewArray, "0", $sFill2)
+    Local $sFill3 = "Object Name:" & "|" & $newItem
+    _ArrayInsert($aNewArray, "0", $sFill3)
 
-    $restoreSel = $aPathSplit2[1] & $aPathSplit2[2]
+    Local $sFileSaveDialog = FileSaveDialog($sMessage, @DesktopDir, "Comma-separated values (*.csv)", $FD_PATHMUSTEXIST + $FD_PROMPTOVERWRITE, "ExportACLView")
+	If @error Then
+		;MsgBox($MB_SYSTEMMODAL, "", "No file was saved.")
+	Else
+		Local $sFileName = StringTrimLeft($sFileSaveDialog, StringInStr($sFileSaveDialog, "\", $STR_NOCASESENSEBASIC, -1))
 
-    ;MsgBox($MB_SYSTEMMODAL, "Title", "Previous: " & $restoreSel)
-    
+		Local $iExtension = StringInStr($sFileName, ".", $STR_NOCASESENSEBASIC)
 
-    ; Removes the TLE system and clears the Tree/Listview
-    __TreeListExplorer_DeleteSystem($hTLESystemRight)
-    __TreeListExplorer_RemoveView($hTreeViewRight)
+		If $iExtension Then
+			If Not (StringTrimLeft($sFileName, $iExtension - 1) = ".csv") Then $sFileSaveDialog &= ".csv"
+		Else
+			$sFileSaveDialog &= ".csv"
+		EndIf
 
-    ; Create TLE system for the right side
-    Global $hTLESystemRight = __TreeListExplorer_CreateSystem($hGUI_1, "", "_currentFolder")
-    If @error Then ConsoleWrite("__TreeListExplorer_CreateSystem failed: "&@error&":"&@extended&@crlf)
+		_FileWriteFromArray($sFileSaveDialog, $aNewArray, 0, Default, ";")
+		;MsgBox($MB_SYSTEMMODAL, "", "You saved the following file:" & @CRLF & $sFileSaveDialog)
+	EndIf
+EndFunc
 
-    ; Add Views to TLE system: ShowFolders=True, ShowFiles=True
-    __TreeListExplorer_AddView($hTLESystemRight, $hTreeViewRight, True, True, "_clickCallback", "_doubleClickCallback", "_loadingCallback", "_selectCallback")
-    If @error Then ConsoleWrite("__TreeListExplorer_AddView $hTreeView failed: "&@error&":"&@extended&@crlf)
 
-    #ce
+Func HideAllCtrls()
+    GUICtrlSetState($selectACE, $GUI_HIDE)
+    GUICtrlSetState($AccessInfoLabel, $GUI_HIDE)
+    GUICtrlSetState($AccessInfoName, $GUI_HIDE)
+    GUICtrlSetState($AccessInfoData, $GUI_HIDE)
+    GUICtrlSetState($BlockLVLabel, $GUI_HIDE)
+    GUICtrlSetState($idListview, $GUI_HIDE)
+    GUICtrlSetState($idListview2, $GUI_HIDE)
+    GUICtrlSetState($idListview3, $GUI_HIDE)
+    GUICtrlSetState($idListviewfile, $GUI_HIDE)
+    GUICtrlSetState($idListviewfile2, $GUI_HIDE)
 EndFunc
 
 
@@ -1662,12 +1727,17 @@ while True
 		__TreeListExplorer_Shutdown()
 		Exit
 	EndIf
+    If $iMsg = $exportCSVLabel Then
+        GUICtrlSetColor($exportCSVLabel, 0xFFFFFF)
+        Sleep(100)
+        GUICtrlSetColor($exportCSVLabel, 0x1E90FF)
+        ExportToCSV()
+    EndIf
+    If $iMsg = $verboseACELabel Then
+        GUICtrlSetColor($verboseACELabel, 0xFFFFFF)
+        Sleep(100)
+        GUICtrlSetColor($verboseACELabel, 0x1E90FF)
+        HideAllCtrls()
+        GUICtrlSetState($OutputText, $GUI_SHOW)
+    EndIf
 WEnd
-
-#cs
-; Just idle around
-While 1
-    Sleep(1000)
-    ;treeviewChangesfunc()
-WEnd
-#ce
