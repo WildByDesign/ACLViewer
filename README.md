@@ -11,12 +11,14 @@ ACL Viewer for Windows
 
 # To Do
 
-- Add an Export option to export the ACL ListView as .txt or .csv
-- Add an Export option to export selected ACE with permissions (and individual permission access masks)
+- ~~Add an Export option to export the ACL ListView as .txt or .csv~~ Done
+- ~~Add an Export option to export selected ACE with permissions (and individual permission access masks)~~ Done
 - Add a Hotkey to toggle hiding/unhiding Inherited ACEs
 - Consider changing the labels to edit boxes to easily copy details from
 
 # Screenshot
 
-![ACLViewer-1 1](https://github.com/user-attachments/assets/86248d6a-26f3-4ca4-b279-a7a3a477afbd)
+![ACLViewer-2 0](https://github.com/user-attachments/assets/aca2eac0-a9a9-4569-821f-789049a2ddd8)
+
+![ACLViewer-2 0-verbose](https://github.com/user-attachments/assets/02c0245a-9a1c-4883-bc15-84ffab645754)
 
