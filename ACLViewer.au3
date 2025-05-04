@@ -40,8 +40,8 @@ Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Description=ACL Viewer
 #AutoIt3Wrapper_res_requestedExecutionLevel=requireAdministrator
-#AutoIt3Wrapper_Res_Fileversion=2.0.0
-#AutoIt3Wrapper_Res_ProductVersion=2.0.0
+#AutoIt3Wrapper_Res_Fileversion=2.0.1
+#AutoIt3Wrapper_Res_ProductVersion=2.0.1
 #AutoIt3Wrapper_Res_ProductName=ACLViewer
 #AutoIt3Wrapper_Outfile_x64=ACLViewer.exe
 #AutoIt3Wrapper_OutFile_x86=ACLViewer.exe
@@ -56,6 +56,8 @@ Global $sRet, $aRet, $newItem, $oldItem, $isFolder, $aUniques, $TV_Icons
 #AutoIt3Wrapper_Res_Icon_Add=icons\foldersel.ico ; @ScriptFullPath, 7
 #AutoIt3Wrapper_Res_Icon_Add=icons\filesel.ico ; @ScriptFullPath, 8
 #AutoIt3Wrapper_Res_Icon_Add=icons\harddrivesel.ico ; @ScriptFullPath, 9
+#AutoIt3Wrapper_Res_Icon_Add=unchecked.ico
+#AutoIt3Wrapper_Res_Icon_Add=checked.ico
 ;#AutoIt3Wrapper_Res_Icon_Add=AppControl-Disabled.ico ;
 ;#EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -406,6 +408,7 @@ $BlockLVLabel = GUICtrlCreateLabel(" ", 100 - 10, $AccessInfoLabelPosV + 30 - 2,
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 
 $idListview = GUICtrlCreateListView("col1", 100, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$hidListview = GUICtrlGetHandle($idListview)
 _GUICtrlListView_SetView($idListview, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_ALL_ACCESS = GUICtrlCreateListViewItem(" Full Control", $idListview)
@@ -429,6 +432,7 @@ GUICtrlSetState($idListview, $GUI_HIDE)
 
 
 $idListview2 = GUICtrlCreateListView("col1", 100 + $idListviewWidth + 40, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$hidListview2 = GUICtrlGetHandle($idListview2)
 _GUICtrlListView_SetView($idListview2, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_WRITE_ATTRIBUTES = GUICtrlCreateListViewItem(" Write Attributes", $idListview2)
@@ -452,6 +456,7 @@ GUICtrlSetState($idListview2, $GUI_HIDE)
 
 
 $idListview3 = GUICtrlCreateListView("col1", 100 + $idListviewWidth + 40 + $idListviewWidth + 40, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$hidListview3 = GUICtrlGetHandle($idListview3)
 _GUICtrlListView_SetView($idListview3, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $IsPropagated = GUICtrlCreateListViewItem(" Propagate to child objects", $idListview3)
@@ -472,6 +477,7 @@ GUICtrlSetState($idListview3, $GUI_HIDE)
 
 $idListviewfile = GUICtrlCreateListView("col1", 100, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
 _GUICtrlListView_SetView($idListviewfile, 3)
+$hidListviewfile = GUICtrlGetHandle($idListviewfile)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_ALL_ACCESSfile = GUICtrlCreateListViewItem(" Full Control", $idListviewfile)
 $sFILE_EXECUTEfile = GUICtrlCreateListViewItem(" Traverse Folder / Execute File", $idListviewfile)
@@ -494,6 +500,7 @@ GUICtrlSetState($idListviewfile, $GUI_HIDE)
 
 
 $idListviewfile2 = GUICtrlCreateListView("col1", 100 + $idListviewfileWidth + 80, $AccessInfoLabelPosV + 30, $ListviewMeasureWidth + 20, $ListviewMeasure2Height, $LVS_NOCOLUMNHEADER, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_CHECKBOXES, $LVS_EX_DOUBLEBUFFER))
+$hidListviewfile2 = GUICtrlGetHandle($idListviewfile2)
 _GUICtrlListView_SetView($idListviewfile2, 3)
 ;GUICtrlSetResizing(-1, $GUI_DOCKALL)
 $sFILE_WRITE_ATTRIBUTESfile = GUICtrlCreateListViewItem(" Write Attributes", $idListviewfile2)
@@ -543,15 +550,57 @@ Endfunc
 
 ApplyThemeColor()
 Func ApplyThemeColor()
+    If $isDarkMode = True Then
+        GuiDarkmodeApply($hGUI_1)
+    Else
+        Local $bEnableDarkTheme = False
+        GuiLightmodeApply($hGUI_1)
+    EndIf
+Endfunc
+
 
 If $isDarkMode = True Then
-	GuiDarkmodeApply($hGUI_1)
-Else
-	Local $bEnableDarkTheme = False
-    GuiLightmodeApply($hGUI_1)
-EndIf
+	$hImageList1 = _GUICtrlListView_GetImageList($hListView, 2)
+	$hImageList2 = _GUICtrlListView_GetImageList($hidListview, 2)
+	$hImageList3 = _GUICtrlListView_GetImageList($hidListview2, 2)
+	$hImageList4 = _GUICtrlListView_GetImageList($hidListview3, 2)
+	$hImageList5 = _GUICtrlListView_GetImageList($hidListviewfile, 2)
+	$hImageList6 = _GUICtrlListView_GetImageList($hidListviewfile2, 2)
+	_GUIImageList_Remove($hImageList1)
+    _GUIImageList_Remove($hImageList2)
+    _GUIImageList_Remove($hImageList3)
+    _GUIImageList_Remove($hImageList4)
+    _GUIImageList_Remove($hImageList5)
+    _GUIImageList_Remove($hImageList6)
 
-Endfunc
+	If @Compiled = 0 Then
+		_GUIImageList_AddIcon($hImageList1, "unchecked.ico")
+		_GUIImageList_AddIcon($hImageList1, "checked.ico")
+        _GUIImageList_AddIcon($hImageList2, "unchecked.ico")
+		_GUIImageList_AddIcon($hImageList2, "checked.ico")
+        _GUIImageList_AddIcon($hImageList3, "unchecked.ico")
+		_GUIImageList_AddIcon($hImageList3, "checked.ico")
+        _GUIImageList_AddIcon($hImageList4, "unchecked.ico")
+		_GUIImageList_AddIcon($hImageList4, "checked.ico")
+        _GUIImageList_AddIcon($hImageList5, "unchecked.ico")
+		_GUIImageList_AddIcon($hImageList5, "checked.ico")
+        _GUIImageList_AddIcon($hImageList6, "unchecked.ico")
+		_GUIImageList_AddIcon($hImageList6, "checked.ico")
+	Else
+		_GUIImageList_AddIcon($hImageList1, @ScriptFullPath, 10)
+		_GUIImageList_AddIcon($hImageList1, @ScriptFullPath, 11)
+        _GUIImageList_AddIcon($hImageList2, @ScriptFullPath, 10)
+		_GUIImageList_AddIcon($hImageList2, @ScriptFullPath, 11)
+        _GUIImageList_AddIcon($hImageList3, @ScriptFullPath, 10)
+		_GUIImageList_AddIcon($hImageList3, @ScriptFullPath, 11)
+        _GUIImageList_AddIcon($hImageList4, @ScriptFullPath, 10)
+		_GUIImageList_AddIcon($hImageList4, @ScriptFullPath, 11)
+        _GUIImageList_AddIcon($hImageList5, @ScriptFullPath, 10)
+		_GUIImageList_AddIcon($hImageList5, @ScriptFullPath, 11)
+        _GUIImageList_AddIcon($hImageList6, @ScriptFullPath, 10)
+		_GUIImageList_AddIcon($hImageList6, @ScriptFullPath, 11)
+	EndIf
+EndIf
 
 
 GUIRegisterMsg($WM_NOTIFY, "WM_NOTIFY2")
